@@ -1,0 +1,6 @@
+python-igraph
+matplotlib
+pycairo
+pandas
+string
+random
