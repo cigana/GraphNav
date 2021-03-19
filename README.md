@@ -2,7 +2,8 @@
 Prototype for Graph-Navigation as Assitive Technology for Blind People
 
 
-Vor dem Aufruf von createKWGraph kann man folgende Zahlen selbst festlegen:
+Man kann man folgende Parameter selbst festlegen:
+
 Anzahl Knoten:
   numberTags
   numberItems
@@ -10,8 +11,7 @@ Anzahl Knoten:
 Anzahl Kanten:
   numberEdges
 
-Nachdem das Programm ausgeführt wird, und das Graph-Fenster geschlossen wird, 
-stehen folgende Befehle zur Verfügung:
+Es stehen folgende Befehle zur Verfügung:
 
 q: Menü verlassen/Beenden
 
