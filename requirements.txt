@@ -2,3 +2,4 @@ python-igraph
 matplotlib
 pycairo
 pandas
+PySimpleGUI
