@@ -11,9 +11,6 @@ def createTags(numberTags):
 
     for i in range(len(tags)):
             tagList.append(tags[i])
-
-
-
     return tagList
 
 #default Graph-Erzeugung - Kanten werden zufällig zwischen Tags und Items verteilt
@@ -80,6 +77,24 @@ def createKWGraph(numberTags, numberItems, numberEdges):
     g.add_edges(t1)
     return g
 
+#Alle Items zu einem Tag
+def findItems(tagName):
+    neis = g.neighbors(tagName, mode="out")
+    return g.vs[neis]["name"]
+
+#Alle Items zu 2 Tags
+def findCommonItems(tagName1, tagName2):
+    path = findPath(tagName1, tagName2)
+    if len(path[0]) > 3:
+        result = "haben keine Items/Tags gemeinsam"
+    else:
+        neiT1 =findItems(tagName1)
+        neiT2 = findItems(tagName2)
+        result = set(neiT1) & set(neiT2)
+    return result
+
+
+
 #erzeugt Dictionary mit key=tagName, value=degree
 def tagDegree(g, numberTags):
     tagDegree = g.vs.degree()[0:numberTags]
@@ -131,7 +146,7 @@ if __name__ == '__main__':
     #Darstellung Graph
     layout = g.layout("kk")
     g.vs["label"] = g.vs["name"]
-    color_dict = {"t": "red", "i": "white"}
+    color_dict = {"t": "green", "i": "white"}
     shape_dict = {"t": "circle", "i": "rectangle"}
     g.vs["color"] = [color_dict[type] for type in g.vs["type"]]
     g.vs["shape"] = [shape_dict[type] for type in g.vs["type"]]
@@ -159,17 +174,17 @@ if __name__ == '__main__':
 
         [sg.Text("Erhalte Informationen durch Tastenbefehle (Befehl+Enter/Execute),")],
         [sg.Text("Folgende Befehle stehen zur Verfügung:")],
-        [sg.Text("Beschreibung")],
-        [sg.Text("o: Überblick (overview)")],
+        [sg.Text("Beschreibung", text_color='black')],
+        [sg.Text("o: Überblick (overview)                  d: Details zu Tags oder Items")],
         [sg.Text("i/t: Auflistung aller Items/Tags")],
         [sg.Text("1/2/3: Auflistung der Tags mit hohem/mittlerem/niedrigem Knotengrad")],
         [sg.Text("v: Auflistung aller Tags mit Knotengrad")],
         [sg.Text("c: Auflistung der Item-Cluster")],
-        [sg.Text("Navigation")],
+        [sg.Text("Navigation", text_color='black')],
         [sg.Text("p: Findet kürzesten Pfad von Tag zu Tag")],
-        [sg.Text('Auswahl:', size=(15, 1)), sg.InputText()],
-        [sg.Text('Pfad von:', size=(15, 1)), sg.InputText()],
-        [sg.Text('Pfad bis:', size=(15, 1)), sg.InputText()],
+        [sg.Text('Auswahl:', size=(16, 1)), sg.InputText()],
+        [sg.Text('Details 1/Pfad von:', size=(16, 1)), sg.InputText()],
+        [sg.Text('Details 2/Pfad bis:', size=(16, 1)), sg.InputText()],
         [sg.Text(size=(20, 1), key="-TIN-")],
         [sg.Button('Execute', bind_return_key=True) ],
         [sg.MLine(key='-ML1-' + sg.WRITE_ONLY_KEY, size=(60, 10))],
@@ -201,7 +216,7 @@ if __name__ == '__main__':
             g = createKWGraph(numberTags,numberItems, numberEdges)
             layout = g.layout("fr")
             g.vs["label"] = g.vs["name"]
-            color_dict = {"t": "red", "i": "white"}
+            color_dict = {"t": "green", "i": "white"}
             shape_dict = {"t": "circle", "i": "rectangle"}
             g.vs["color"] = [color_dict[type] for type in g.vs["type"]]
             g.vs["shape"] = [shape_dict[type] for type in g.vs["type"]]
@@ -217,6 +232,30 @@ if __name__ == '__main__':
                 window['-ML1-' + sg.WRITE_ONLY_KEY].print("hier anzahl cluster auflisten")
             if cmd == 'e':
                 window['-ML1-' + sg.WRITE_ONLY_KEY].print("Alle Kanten (egdes):", g.get_edgelist())
+            # Ausgabe Details:
+            if cmd == 'd':
+                VertexList = g.vs["name"]
+                tagList = createTags(numberTags)
+                # eigentlich ob es in Knotenliste ist
+                if values[4] not in VertexList:
+                    window['-ML1-' + sg.WRITE_ONLY_KEY].print("Erste Eingabe fehlerhaft.")
+                if (values[5] != '') and (values[5] not in VertexList):
+                    window['-ML1-' + sg.WRITE_ONLY_KEY].print("Zweite Eingabe fehlerhaft.")
+                if (values[4] in VertexList) and (values[5] == ''):
+                    neighbors = findItems(values[4])
+                    if values[4] in tagList:
+                        window['-ML1-' + sg.WRITE_ONLY_KEY].print("Es gibt", len(neighbors), "Items die zu Tag",values[4], "gehören:", neighbors)
+                    if values[4] not in tagList:
+                        window['-ML1-' + sg.WRITE_ONLY_KEY].print("Es gibt", len(neighbors), "Tags die zu Item",values[4], "gehören:", neighbors)
+                else:
+                    commonNodes = findCommonItems(values[4], values[5])
+                    if commonNodes == "haben keine Items/Tags gemeinsam":
+                        window['-ML1-' + sg.WRITE_ONLY_KEY].print("Die Tags oder Items", values[4], "und", values[5], commonNodes)
+                    else:
+                        if values[4] in tagList:
+                            window['-ML1-' + sg.WRITE_ONLY_KEY].print("Die", len(commonNodes), "gemeinsamen Items von",values[4], "und", values[5],"sind:", commonNodes)
+                        else:
+                            window['-ML1-' + sg.WRITE_ONLY_KEY].print("Die", len(commonNodes), "gemeinsamen Tags von",values[4], "und", values[5], "sind:", commonNodes)
             if cmd == 'i':
                 window['-ML1-' + sg.WRITE_ONLY_KEY].print("Es gibt folgende Items: ", g.vs.select(type="i")["name"])
             if cmd == 'o':
