@@ -2,7 +2,6 @@
 #erzeugt Liste der Tags
 from igraph._igraph import OUT
 
-
 def createTags(numberTags):
     tags_up = string.ascii_uppercase[0:26]
     tags_low = string.ascii_lowercase[0:26]
@@ -77,6 +76,11 @@ def createKWGraph(numberTags, numberItems, numberEdges):
     g.add_edges(t1)
     return g
 
+#entferne isolierte Knoten
+def dropIsolates(g) -> object:
+    g.delete_vertices(g.vs.select(_degree=0))
+    return g
+
 #Alle Items zu einem Tag
 def findItems(tagName):
     neis = g.neighbors(tagName, mode="out")
@@ -93,14 +97,13 @@ def findCommonItems(tagName1, tagName2):
         result = set(neiT1) & set(neiT2)
     return result
 
-
-
-#erzeugt Dictionary mit key=tagName, value=degree
-def tagDegree(g, numberTags):
-    tagDegree = g.vs.degree()[0:numberTags]
-    tags = createTags(numberTags)
-    tDeg =dict(zip(tags, tagDegree))
-    return tDeg
+#erzeugt Dictionary mit key=Vertex-Name, value=degree, Absteigende Reihenfolge
+def listDegree(g, strType) -> object:
+    names = (g.vs.select(type=strType)["name"])
+    deg = (g.vs.select(type=strType).degree())
+    lDeg =dict(zip(names, deg))
+    sort_Deg = dict(sorted(lDeg.items(), key=lambda x: x[1], reverse=True))
+    return sort_Deg
 
 #sortiert tags in Kategorien nach Knotengrad
 def rankTags(dictTDeg):
@@ -117,7 +120,6 @@ def rankTags(dictTDeg):
             low.append(tag)
 
     sortTags = [high, medium, low]
-
     return sortTags
 
 def findPath(tag1, tag2):
@@ -126,6 +128,32 @@ def findPath(tag1, tag2):
     #    if n < numberTags:
     #        print("{}".format(g.vs[n]['name']))
     return path
+
+# Hilfsfunktion zur Cluster Funktion
+def defineGroups(itemList):
+    dict = {}
+    for item in itemList:
+        group = findItems(item)
+        groupWord = ' '.join(group)
+        if groupWord  in dict:
+            dict[groupWord].append(item)
+        else:
+            dict[groupWord ] = [item]
+    return dict
+
+# Finde Cluster im Graphen, einfacher Ansatz
+def findCluster(g):
+    itemDeg = listDegree(g, "i")
+    deg_dict = {}
+    cluster = {}
+    for key in itemDeg:
+        deg_dict.setdefault(itemDeg[key], []).append(key)
+
+    for key in deg_dict.keys():
+        val = defineGroups(deg_dict[key])
+        cluster[key] = [val]
+
+    return cluster
 
 if __name__ == '__main__':
     import igraph
@@ -175,8 +203,8 @@ if __name__ == '__main__':
         [sg.Text("Erhalte Informationen durch Tastenbefehle (Befehl+Enter/Execute),")],
         [sg.Text("Folgende Befehle stehen zur Verfügung:")],
         [sg.Text("Beschreibung", text_color='black')],
-        [sg.Text("o: Überblick (overview)                  d: Details zu Tags oder Items")],
-        [sg.Text("i/t: Auflistung aller Items/Tags")],
+        [sg.Text("o: Überblick (overview)                       z: Zusammenhängender Graph")],
+        [sg.Text("i/t: Auflistung aller Items/Tags              d: Details zu Tags oder Items")],
         [sg.Text("1/2/3: Auflistung der Tags mit hohem/mittlerem/niedrigem Knotengrad")],
         [sg.Text("v: Auflistung aller Tags mit Knotengrad")],
         [sg.Text("c: Auflistung der Item-Cluster")],
@@ -213,7 +241,7 @@ if __name__ == '__main__':
             numberTags = int(values[0])
             numberItems = int(values[1])
             numberEdges = int(values[2])
-            g = createKWGraph(numberTags,numberItems, numberEdges)
+            g = createKWGraph(numberTags, numberItems, numberEdges)
             layout = g.layout("fr")
             g.vs["label"] = g.vs["name"]
             color_dict = {"t": "green", "i": "white"}
@@ -226,42 +254,52 @@ if __name__ == '__main__':
         if event == "Execute":
             ausgabe=""
             cmd = values[3]
-            tagDeg = tagDegree(g, numberTags)
+            tagDeg = listDegree(g, "t")
             tagRank = rankTags(tagDeg)
             if cmd == 'c':
-                window['-ML1-' + sg.WRITE_ONLY_KEY].print("hier anzahl cluster auflisten")
+                cluster = findCluster(g)
+                window['-ML1-' + sg.WRITE_ONLY_KEY].print("Folgende Cluster wurden gefunden, sortiert nach Größe absteigend ->Anzahl Tags -> Namen Tags, Dazugehörige Items<-  ", cluster)
             if cmd == 'e':
                 window['-ML1-' + sg.WRITE_ONLY_KEY].print("Alle Kanten (egdes):", g.get_edgelist())
-            # Ausgabe Details:
+            # Ausgabe Details ****NEU**********:
             if cmd == 'd':
                 VertexList = g.vs["name"]
-                tagList = createTags(numberTags)
-                # eigentlich ob es in Knotenliste ist
-                if values[4] not in VertexList:
-                    window['-ML1-' + sg.WRITE_ONLY_KEY].print("Erste Eingabe fehlerhaft.")
-                if (values[5] != '') and (values[5] not in VertexList):
-                    window['-ML1-' + sg.WRITE_ONLY_KEY].print("Zweite Eingabe fehlerhaft.")
-                if (values[4] in VertexList) and (values[5] == ''):
-                    neighbors = findItems(values[4])
-                    if values[4] in tagList:
-                        window['-ML1-' + sg.WRITE_ONLY_KEY].print("Es gibt", len(neighbors), "Items die zu Tag",values[4], "gehören:", neighbors)
-                    if values[4] not in tagList:
-                        window['-ML1-' + sg.WRITE_ONLY_KEY].print("Es gibt", len(neighbors), "Tags die zu Item",values[4], "gehören:", neighbors)
-                else:
-                    commonNodes = findCommonItems(values[4], values[5])
-                    if commonNodes == "haben keine Items/Tags gemeinsam":
-                        window['-ML1-' + sg.WRITE_ONLY_KEY].print("Die Tags oder Items", values[4], "und", values[5], commonNodes)
+                tagList = (g.vs.select(type='t')["name"])
+                # prüfe ob eine Eingabe leer ist
+                if (values[4] == '') or (values[5] == ''):
+                    # beide leer
+                    if (values[4] == '') and (values[5] == ''):
+                        window['-ML1-' + sg.WRITE_ONLY_KEY].print("Zur Abfrage der Details mindestens ein Tag oder Item auswählen. Bei zwei Einträgen gleichartige Knoten wählen")
                     else:
-                        if values[4] in tagList:
-                            window['-ML1-' + sg.WRITE_ONLY_KEY].print("Die", len(commonNodes), "gemeinsamen Items von",values[4], "und", values[5],"sind:", commonNodes)
+                        vertex = values[4] + values[5]
+                        if (vertex not in VertexList):
+                            window['-ML1-' + sg.WRITE_ONLY_KEY].print("Die Eingabe ist fehlerhaft.")
                         else:
-                            window['-ML1-' + sg.WRITE_ONLY_KEY].print("Die", len(commonNodes), "gemeinsamen Tags von",values[4], "und", values[5], "sind:", commonNodes)
+                            neighbors = findItems(vertex)
+                            if vertex in tagList:
+                                window['-ML1-' + sg.WRITE_ONLY_KEY].print("Es gibt", len(neighbors), "Items die zu Tag", vertex, "gehören:", neighbors)
+                            else:
+                                window['-ML1-' + sg.WRITE_ONLY_KEY].print("Es gibt", len(neighbors), "Tags die zu Item", vertex, "gehören:", neighbors)
+                # in beiden Fenstern ist was eingetragen -> Prüfung ob gleicher Typ fehlt noch
+                else:
+                    if (values[4] not in VertexList) or (values[5] not in VertexList):
+                        window['-ML1-' + sg.WRITE_ONLY_KEY].print("Die Eingabe ist fehlerhaft.")
+                    else:
+                        commonNodes = findCommonItems(values[4], values[5])
+                        if commonNodes == "haben keine Items/Tags gemeinsam":
+                            window['-ML1-' + sg.WRITE_ONLY_KEY].print("Die Tags oder Items", values[4], "und", values[5], commonNodes)
+                        else:
+                            if values[4] in tagList:
+                                window['-ML1-' + sg.WRITE_ONLY_KEY].print("Die", len(commonNodes), "gemeinsamen Items von", values[4], "und", values[5], "sind:", commonNodes)
+                            else:
+                                window['-ML1-' + sg.WRITE_ONLY_KEY].print("Die", len(commonNodes), "gemeinsamen Tags von", values[4], "und", values[5], "sind:", commonNodes)
+
             if cmd == 'i':
                 window['-ML1-' + sg.WRITE_ONLY_KEY].print("Es gibt folgende Items: ", g.vs.select(type="i")["name"])
             if cmd == 'o':
                 window['-ML1-' + sg.WRITE_ONLY_KEY].print("Der vorliegende Graph enthält insgesamt", numberItems, "Items und", numberTags, "Tags. Es sind", len(tagRank[0]), "Tags mit hohem Knotengrad,", len(tagRank[1]), "Tags mit mittlerem Knotengrad, und", len(tagRank[2]), "Tags mit niedrigem Knotengrad.", end='')
             if cmd == 'p':
-                tagList = createTags(numberTags)
+                tagList = (g.vs.select(type='t')["name"])
                 if values[4] not in tagList:
                     window['-ML1-' + sg.WRITE_ONLY_KEY].print("Erste Eingabe fehlerhaft.")
                 if values[5] not in tagList:
@@ -276,14 +314,24 @@ if __name__ == '__main__':
             if cmd == 't':
                 window['-ML1-' + sg.WRITE_ONLY_KEY].print("Es gibt folgende Tags: ", g.vs.select(type="t")["name"]) # alpabethische Sortierung fehlt noch
             if cmd == 'v':
-                window['-ML1-' + sg.WRITE_ONLY_KEY].print("Die Tag-Knoten mit Knotengrad: ", tagDeg)
+                tagDeg = listDegree(g, "t")
+                itemDeg = listDegree(g, "i")
+                window['-ML1-' + sg.WRITE_ONLY_KEY].print("Die Tag-Knoten mit Knotengrad in absteigender Reihenfolge: ", tagDeg)
+                window['-ML1-' + sg.WRITE_ONLY_KEY].print("Die Items mit Knotengrad in absteigender Reihenfolge:", itemDeg)
+
             if cmd == '1':
                 window['-ML1-' + sg.WRITE_ONLY_KEY].print("Es gibt", len(tagRank[0]), "Tags mit hohem Knotengrad. Es sind: ", tagRank[0])
             if cmd == '2':
                 window['-ML1-' + sg.WRITE_ONLY_KEY].print("Es gibt", len(tagRank[1]), "Tags mit mittlerem Knotengrad. Es sind: ", tagRank[1])
             if cmd == '3':
                 window['-ML1-' + sg.WRITE_ONLY_KEY].print("Es gibt", len(tagRank[2]), "Tags mit niedrigem Knotengrad. Es sind: ", tagRank[2])
-
+            if cmd == 'z':
+                g = dropIsolates(g)
+                tagList = (g.vs.select(type='t')["name"])
+                numberTags = len(tagList)
+                numberItems = len(g.vs.select(type='i')["name"])
+                igraph.plot(g, "testgraph2.png")
+                window["-DEFAULT-"].update(filename="testgraph2.png")
             window['-ML1-' + sg.WRITE_ONLY_KEY].print('\n', end='')
 
     window.close()
